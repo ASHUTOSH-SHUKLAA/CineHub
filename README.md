@@ -1,2 +1,2 @@
 # CineHub
-An entertainment platform that serve for Ticket Booking,  watching short films, and reading/reviewing. 
+An entertainment platform that serve for Ticket Booking,  watching short films, and reading/reviewing reviews. 
