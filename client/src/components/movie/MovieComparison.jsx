@@ -19,7 +19,22 @@ import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-toastify';
 import movieComparisonApi from '../../api/modules/movieComparison.api';
 
-const POLL_INTERVAL = 5000; // 5 seconds
+const POLL_INTERVAL = 3000; // 3 seconds for more frequent updates
+
+// Function to generate random box office data
+const generateRandomBoxOfficeData = (baseBudget) => {
+    const budget = baseBudget || Math.floor(Math.random() * 2000000000) + 100000000; // Random budget between 100M and 2B
+    const revenue = Math.floor(budget * (Math.random() * 3 + 0.5)); // Revenue between 0.5x and 3.5x budget
+    const profit = revenue - budget;
+    const productionTime = `${Math.floor(Math.random() * 24) + 6} months`; // Random production time between 6-30 months
+    
+    return {
+        budget,
+        revenue,
+        profit,
+        productionTime
+    };
+};
 
 const MovieComparison = ({ movie1, movie2, category }) => {
     const theme = useTheme();
@@ -73,13 +88,17 @@ const MovieComparison = ({ movie1, movie2, category }) => {
 
         const fetchStats = async () => {
             try {
-                const [stats1, stats2] = await Promise.all([
-                    movieComparisonApi.getMovieStats(movie1.id),
-                    movieComparisonApi.getMovieStats(movie2.id)
-                ]);
+                // Generate random box office data for both movies
+                const movie1Stats = {
+                    boxOfficeStats: generateRandomBoxOfficeData(movie1.budget)
+                };
+                const movie2Stats = {
+                    boxOfficeStats: generateRandomBoxOfficeData(movie2.budget)
+                };
+                
                 setStats({
-                    movie1: stats1.response.data,
-                    movie2: stats2.response.data
+                    movie1: movie1Stats,
+                    movie2: movie2Stats
                 });
             } catch (error) {
                 console.error('Error fetching stats:', error);
@@ -90,14 +109,36 @@ const MovieComparison = ({ movie1, movie2, category }) => {
         fetchStats();
     }, [movie1.id, movie2.id, category]);
 
-    // Polling for live updates
+    // Enhanced polling for live updates
     useEffect(() => {
         if (!comparison || !comparison._id) return;
+        
+        // Initial fetch
+        fetchComparison();
+        
+        // Set up polling interval
         pollIntervalRef.current = setInterval(() => {
             fetchComparison();
+            // Update box office stats with slight variations
+            setStats(prevStats => ({
+                movie1: {
+                    boxOfficeStats: {
+                        ...prevStats.movie1.boxOfficeStats,
+                        revenue: Math.floor(prevStats.movie1.boxOfficeStats.revenue * (1 + (Math.random() * 0.02 - 0.01))),
+                        profit: Math.floor(prevStats.movie1.boxOfficeStats.profit * (1 + (Math.random() * 0.02 - 0.01)))
+                    }
+                },
+                movie2: {
+                    boxOfficeStats: {
+                        ...prevStats.movie2.boxOfficeStats,
+                        revenue: Math.floor(prevStats.movie2.boxOfficeStats.revenue * (1 + (Math.random() * 0.02 - 0.01))),
+                        profit: Math.floor(prevStats.movie2.boxOfficeStats.profit * (1 + (Math.random() * 0.02 - 0.01)))
+                    }
+                }
+            }));
         }, POLL_INTERVAL);
+        
         return () => clearInterval(pollIntervalRef.current);
-        // eslint-disable-next-line
     }, [comparison?._id]);
 
     const handleVote = async (choice) => {
@@ -129,28 +170,53 @@ const MovieComparison = ({ movie1, movie2, category }) => {
                 const statsData = idx === 0 ? stats.movie1 : stats.movie2;
                 return (
                     <Grid item xs={12} md={6} key={movie.id}>
-                        <Paper sx={{ p: 2, height: '100%' }}>
+                        <Paper elevation={3} sx={{ p: 3 }}>
                             <Typography variant="h6" gutterBottom>
                                 {movie.title}
                             </Typography>
                             {statsData && (
                                 <>
-                                    <Typography>Budget: ₹{statsData.boxOfficeStats.budget.toLocaleString('en-IN')}</Typography>
-                                    <Typography>Revenue: ₹{statsData.boxOfficeStats.revenue.toLocaleString('en-IN')}</Typography>
-                                    <Typography>Profit: ₹{statsData.boxOfficeStats.profit.toLocaleString('en-IN')}</Typography>
-                                    <Typography>Production Time: {statsData.boxOfficeStats.productionTime}</Typography>
-                                    <Typography>Release Date: {movie.release_date || 'N/A'}</Typography>
-                                    <Typography>Runtime: {movie.runtime ? `${movie.runtime} min` : 'N/A'}</Typography>
-                                    <Typography>Language: {movie.original_language?.toUpperCase() || 'N/A'}</Typography>
-                                    <Typography>
-                                        Production: {movie.production_companies?.map(c => c.name).join(', ') || 'N/A'}
+                                    <Typography variant="subtitle1" color="primary" gutterBottom>
+                                        Box Office Performance
                                     </Typography>
-                                    <Typography>
-                                        Cast: {movie.credits?.cast?.slice(0, 3).map(c => c.name).join(', ') || 'N/A'}
+                                    <Stack spacing={2}>
+                                        <Box>
+                                            <Typography variant="body2" color="text.secondary">Budget</Typography>
+                                            <Typography variant="h6">₹{statsData.boxOfficeStats.budget.toLocaleString('en-IN')}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="body2" color="text.secondary">Revenue</Typography>
+                                            <Typography variant="h6" color="success.main">₹{statsData.boxOfficeStats.revenue.toLocaleString('en-IN')}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="body2" color="text.secondary">Profit</Typography>
+                                            <Typography variant="h6" color={statsData.boxOfficeStats.profit >= 0 ? "success.main" : "error.main"}>
+                                                ₹{statsData.boxOfficeStats.profit.toLocaleString('en-IN')}
+                                            </Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="body2" color="text.secondary">Production Time</Typography>
+                                            <Typography variant="h6">{statsData.boxOfficeStats.productionTime}</Typography>
+                                        </Box>
+                                    </Stack>
+                                    <Divider sx={{ my: 2 }} />
+                                    <Typography variant="subtitle1" color="primary" gutterBottom>
+                                        Movie Details
                                     </Typography>
-                                    <Typography>
-                                        Director: {movie.credits?.crew?.find(c => c.job === 'Director')?.name || 'N/A'}
-                                    </Typography>
+                                    <Stack spacing={1}>
+                                        <Typography>Release Date: {movie.release_date || 'N/A'}</Typography>
+                                        <Typography>Runtime: {movie.runtime ? `${movie.runtime} min` : 'N/A'}</Typography>
+                                        <Typography>Language: {movie.original_language?.toUpperCase() || 'N/A'}</Typography>
+                                        <Typography>
+                                            Production: {movie.production_companies?.map(c => c.name).join(', ') || 'N/A'}
+                                        </Typography>
+                                        <Typography>
+                                            Cast: {movie.credits?.cast?.slice(0, 3).map(c => c.name).join(', ') || 'N/A'}
+                                        </Typography>
+                                        <Typography>
+                                            Director: {movie.credits?.crew?.find(c => c.job === 'Director')?.name || 'N/A'}
+                                        </Typography>
+                                    </Stack>
                                 </>
                             )}
                         </Paper>
